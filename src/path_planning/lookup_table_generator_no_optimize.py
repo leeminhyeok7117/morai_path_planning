@@ -54,7 +54,6 @@ def generate_lookup_table():
             km = round(curvature[len(curvature)//2], 4)
             kf = round(curvature[-1], 4)
             lookup_table.append([x_end, y_end, yaw_end, km, kf])
-    print('실제 state 개수', len(x))
     print("finish lookup table generation")
     save_lookup_table("lookup_table.csv", lookup_table)
 
