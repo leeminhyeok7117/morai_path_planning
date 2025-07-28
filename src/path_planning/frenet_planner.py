@@ -14,8 +14,10 @@ from global_path import GlobalPath
 import polynomial as polynomial
 import frenet_path as frenet_path
 
-W_OFFSET = 1 #safety cost 가중치
+W_OFFSET = 1.0 #safety cost 가중치
 W_CONSISTENCY = 0.5 #smoothness cost 가중치
+W_OBSTACLE = 1.0
+COLLISION_COST = 0.5 #m
 
 class TrajectoryPlanner: # path planner
     def __init__(self, node, gp_name):
@@ -24,9 +26,11 @@ class TrajectoryPlanner: # path planner
         self.node = node
         self.candidate_pub = rospy.Publisher('/CDpath_fp', PointCloud2, queue_size=10)
         self.selected_pub = rospy.Publisher('/SLpath_fp', PointCloud2, queue_size=10)
-
+        self.current_speed_sub = rospy.Subscriber('/current_speed', Float64, self.current_speed_callback, queue_size=1)
+        self.obstacle_sub = rospy.Subscriber('/global_obs', PointCloud2, self.lidar_callback, queue_size=10)
         self.visual = True
 
+        self.processed = []
         self.current_speed = 0.0
         self.ds = 0.0
         self.current_s = 0
@@ -76,6 +80,28 @@ class TrajectoryPlanner: # path planner
         ds_min, ds_max, v_max = 2.0, 20.0, 50.0
         self.ds = ds_min + (self.current_speed/v_max)*(ds_max - ds_min)
 
+    def lidar_callback(self, data):  
+        raw_points = point_cloud2.read_points(
+            data,
+            field_names=("x","y","z","intensity"),
+            skip_nans=True
+        )
+
+        points_list = []
+        for p in raw_points:
+            points_list.append([p[0], p[1], p[2], p[3]])
+        
+        if not points_list:
+            self.processed = None
+            return
+
+        points = np.array(points_list, dtype=np.float32)
+        
+        if points.ndim == 1:
+            points = points[np.newaxis, :]
+
+        self.processed = points[:, :2]  
+
     def generate_path(self, si, qi, dtheta, ds = 3): 
         # (si, qi): 시작상태, dtheta: heading - ryaw, ds: polynomial의 길이, qf: 종료상태 q
         candidate_paths = []
@@ -99,7 +125,8 @@ class TrajectoryPlanner: # path planner
 
             fp.offset_cost = abs(qf_i)
             fp.consistency_cost = self.calc_consistency_cost(fp.q, self.last_selected_path.q)
-            fp.total_cost = W_CONSISTENCY * fp.consistency_cost + W_OFFSET * fp.offset_cost
+            fp.obstacle_cost = self.calc_obstacle_cost(fp.x, fp.y)
+            fp.total_cost = W_CONSISTENCY * fp.consistency_cost + W_OFFSET * fp.offset_cost + W_OBSTACLE * fp.obstacle_cost
             
             candidate_paths.append(fp)
 
@@ -112,6 +139,18 @@ class TrajectoryPlanner: # path planner
         
         consistency_cost = np.sum(diff) / len(last_selected_q) if len(last_selected_q) > 0 else 0
         return consistency_cost
+    
+    def calc_obstacle_cost(self, x_arr, y_arr):
+        path_xy = np.stack((x_arr, y_arr), axis=1)
+        obs_xy = self.processed
+        if self.processed is None or len(self.processed) == 0:
+            return 0.0
+        
+        dists = np.linalg.norm(path_xy[None, :, :] - obs_xy[:, None, :], axis=2)
+        min_dists = np.min(dists, axis=0)
+
+        obstacle_cost = np.sum(np.where(min_dists <= COLLISION_COST, 1e6, 1.0 / (min_dists + 1e-6)))
+        return obstacle_cost
 
     def optimal_trajectory(self, x, y, heading):
         si, qi = self.glob_path.xy2sl(x, y)
@@ -120,11 +159,15 @@ class TrajectoryPlanner: # path planner
         ryaw = self.glob_path.get_current_reference_yaw_no_s()
         dtheta = heading - ryaw 
         
-        selected_path = self.generate_path(si, qi, dtheta, self.ds)
-        
+        candidate_paths = self.generate_path(si, qi, dtheta, self.ds)
+
+        selected_path = min(candidate_paths, key=lambda fp: fp.total_cost)
+        self.last_selected_path = selected_path
+
         ############### RVIZ 비쥬얼 코드 ##############
         if self.visual == True:
-            self.visual_selected_path(selected_path)
+            self.visual_selected_path(list(zip(selected_path.x, selected_path.y)))
+            self.visual_candidate_paths([list(zip(fp.x, fp.y)) for fp in candidate_paths])
         ##############################################
 
         return selected_path

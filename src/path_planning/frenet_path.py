@@ -27,3 +27,4 @@ class Frenet_path:
         self.obs_distance = 0
         self.consistency_cost = 0
         self.total_cost = 0
+        self.obstacle_cost = 0
