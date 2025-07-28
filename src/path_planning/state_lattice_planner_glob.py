@@ -27,8 +27,8 @@ class StateLatticePlanner:
         self.lookup_table = self.get_lookup_table(TABLE_PATH)
         self.kdtree = KDTree(self.lookup_table[:, :3])
         
-        self.max_steer = np.deg2rad(25.0)
-        self.min_steer = -np.deg2rad(25.0)
+        self.max_steer = np.deg2rad(40.0)
+        self.min_steer = -np.deg2rad(40.0)
 
         self.x_horizon = 0.0
         self.y_width = 0.0
@@ -301,7 +301,7 @@ class StateLatticePlanner:
         candidate_points = self.generate_candidate_points(obs_xy, x, y, heading)
         candidate_paths = np.array(self.generate_hermite_spline(x, y, candidate_points))
         self.visual_candidate_paths(candidate_paths)
-        selected_path = min(candidate_paths,key=lambda p: self.cost_function(p, obs_xy))   
+        selected_path = np.min(candidate_paths, key=lambda p: self.cost_function(p, obs_xy))   
         self.visual_selected_path(selected_path)
         
         return selected_path

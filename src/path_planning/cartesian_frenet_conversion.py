@@ -25,7 +25,7 @@ def get_mission_coord():
     return mission_name
 
 
-def getClosestSPoint(rx, ry, x, y, last_search, iteration, mode, mission):  # 연산 속도 높이기 성공
+def getClosestSPoint(rx, ry, x, y, last_search, iteration, mode, mission):  # 연산 속도 높이기 성공 # 경로 위치(x,y)와 가장 가까운 점(s 인덱스)을 찾는다.
     global initialize_mission_flag
     global mission_name
     global last_closestrefpoint
@@ -94,69 +94,8 @@ def sl2xy(s, l, cur_rx, cur_ry, cur_ryaw):
 
     return x, y
 
-
-""""
-def cartesian_to_frenet(self,cur_rs,cur_rx,cur_ry,rtheta,rkappa,rdkappa,x,y,v,a,theta,kappa):
-    dx = x - self.rx
-    dy = y - self.ry
-    d, d_d, d_dd, s, s_d, s_dd = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-    cos_theta_r = cos(self.ryaw)
-    sin_theta_r = sin(self.ryaw)
-
-    cross_rn_nd = cos_theta_r * dy - sin_theta_r * dx
-    d = copysign(sqrt(dx*dx+dy*dy), cross_rn_nd)
-
-    delta_theta = theta - self.ryaw
-    tan_delta_theta = tan(delta_theta)
-    cos_delta_theta = cos(delta_theta)
-
-    one_minus_kappa_r_d = 1 - self.rk * d
-    d_d = one_minus_kappa_r_d * tan_delta_theta
-
-    kappa_r_d_prime = self.rdk * d + self.rk * d_d
-    d_dd = -1.0 * kappa_r_d_prime * tan_delta_theta + one_minus_kappa_r_d / cos_delta_theta / cos_delta_theta * (kappa * one_minus_kappa_r_d/ cos_delta_theta - self.rk)
-
-    s = rs
-
-    s_d = v * cos_delta_theta/ one_minus_kappa_r_d
-    delta_theta_prime = one_minus_kappa_r_d / cos_delta_theta * kappa - self.rk
-
-    s_dd = (a * cos_delta_theta - s_d * s_d *
-            (d_d * delta_theta_prime - kappa_r_d_prime))/one_minus_kappa_r_d
-
-    return s, s_d, s_dd, d, d_d, d_dd
-"""
-
-
 def main():
-    """
-    import rospy
-    import matplotlib.pyplot as plt
-    import sensor.sensor_data_communication as sensor_data_communication
-
-    rospy.init_node("test_converter")
-    dataHub = sensor_data_communication.sensor_data_communicationer()
-
-    testPath = path_data.Path()
-
-    x, y, yaw = [], [], []
-    a = True
-    while not rospy.is_shutdown():
-        while not dataHub.readySensor():
-            print("Sensor is not ready")
-            continue
-        if a:
-            print("start!")
-            a = False
-        x, y, yaw = dataHub.get_pose()
-        #refpoint = converter.getClosestSPoint(x, y)
-        s, l = testPath.xy2sl(x,y)
-        print("s, l", s, l)
-        re_x, re_y = testPath.sl2xy(s, l)
-        print("x, y", re_x, re_y)
-        rate.sleep()
-    """
-
+    pass
 
 if __name__ == '__main__':
     main()

@@ -27,8 +27,8 @@ class StateLatticePlanner:
         self.lookup_table = self.get_lookup_table(TABLE_PATH)
         self.kdtree = KDTree(self.lookup_table[:, :3])
         
-        self.max_steer = np.deg2rad(25.0)
-        self.min_steer = -np.deg2rad(25.0)
+        self.max_steer = np.deg2rad(40.0)
+        self.min_steer = -np.deg2rad(40.0)
 
         self.x_horizon = 0.0
         self.y_width = 0.0
@@ -107,13 +107,13 @@ class StateLatticePlanner:
     
     #weight 조정해야됨
     def get_goal_angle_obs(self, obs_xy, max_lat_offset = 3.0, max_angle = np.deg2rad(20.0), weight = 0.8):
-        l_car = self.glob_path.q_val_local(0, 0)
+        _, l_car = self.glob_path.xy2sl_local(0, 0)
         dir_path = -np.sign(l_car)
         ratio_path = min(abs(l_car) / max_lat_offset, 1.0)
         angle_path = dir_path * ratio_path * max_angle
 
         obs_x, obs_y = obs_xy
-        l_obs = self.glob_path.q_val_local(obs_x, obs_y) #나중에 장애물 복수로 받아지게 ㄱ
+        _, l_obs = self.glob_path.xy2sl_local(obs_x, obs_y) #나중에 장애물 복수로 받아지게 ㄱ
 
         dir_obs = -np.sign(l_obs)
         ratio_obs = min(abs(l_obs) / max_lat_offset, 1.0)
@@ -122,7 +122,7 @@ class StateLatticePlanner:
         goal_angle = weight * angle_obs + (1 - weight) * angle_path
         return goal_angle
 
-##########################Sampling (Normal, Biased)##########################
+##########################Sampling (Normal, Biased)###########################
     def sample_states(self, angle_samples, a_min, a_max, d, p_min, p_max, nh):
         angle_samples = np.array(angle_samples)
         a_vals = a_min + (a_max - a_min) * angle_samples  
@@ -265,7 +265,7 @@ class StateLatticePlanner:
     # Calculate cost_function
     def cost_function(self, pose, obs_xy):
         cost1, cost2 = 0.0, 0.0
-        path_separation = self.glob_path.q_val_local(pose[-1][0], pose[-1][1])
+        _, path_separation = self.glob_path.xy2sl_local(pose[-1][0], pose[-1][1])
         cost1 = abs(path_separation/2.3) if -0.5 <= path_separation <= 0.5 else abs(path_separation * 100)
         
         if obs_xy is not None:
