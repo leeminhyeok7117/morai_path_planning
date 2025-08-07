@@ -14,14 +14,14 @@ from sensor_msgs import point_cloud2
 from global_path import GlobalPath
 from cubic_hermite_planner import hermite_with_constraints
 
-TABLE_PATH = os.path.dirname(os.path.abspath(__file__)) + "/lookup_table.csv"
+TABLE_PATH = "src/molt/lookup_table.csv"
 Param = namedtuple('Param',['nxy','nh','d','a_min','a_max','p_min','p_max','ns'])
 
 class StateLatticePlanner:
     def __init__(self, gp_name):
-        self.candidate_pub = rospy.Publisher('/CDpath_st', PointCloud2, queue_size=10)
-        self.selected_pub = rospy.Publisher('/SLpath_st', PointCloud2, queue_size=10)
-        self.current_speed_sub = rospy.Subscriber('/current_speed', Float64, self.current_speed_callback, queue_size=1)
+        self.candidate_pub = rospy.Publisher('/CDpath_sl', PointCloud2, queue_size=10)
+        self.selected_pub = rospy.Publisher('/SLpath_sl', PointCloud2, queue_size=10)
+        self.current_speed_sub = rospy.Subscriber('/speed', Float64, self.current_speed_callback, queue_size=1)
         
         self.glob_path = GlobalPath(gp_name)
         self.lookup_table = self.get_lookup_table(TABLE_PATH)
@@ -263,7 +263,7 @@ class StateLatticePlanner:
     def generate_hermite_spline(self, x, y, candidate_points, point_num=5):
         candidate_paths = []                
         for state in candidate_points:
-            x_vals, y_vals, yaw_vals, _ = hermite_with_constraints([x,y], [state[0], state[1]], 0.0, state[2]) #현재 yaw값 적용해야되는지 잘 몰겟(아닐듯?)
+            x_vals, y_vals, yaw_vals, _ = hermite_with_constraints([x,y], [state[0]+x, state[1]+y], 0.0, state[2]) #현재 yaw값 적용해야되는지 잘 몰겟(아닐듯?)
             
             idxs = np.round(np.linspace(0, len(x_vals)-1, point_num)).astype(int)
             candidate_path = np.stack([x_vals[idxs],y_vals[idxs],yaw_vals[idxs]], axis=1) 

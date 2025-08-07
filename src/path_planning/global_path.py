@@ -46,49 +46,7 @@ class GlobalPath:
         self.ry_arr = np.array(self.ry)
         self.ryaw_arr = np.array(self.ryaw)
         self.rk_arr = np.array(self.rk)
-     
-    #######################지역 경로 용도로 사용######################    
-    
-    #현재 위치 기반으로 인덱스를 구하고 그만큼 local 경로 뽑아냄
-    def get_local_path(self, x, y, lookbehind_s = 3, lookahead_s = 20):
-        glob_index = self.getClosestSIndexCurXY(x, y, 1)
-        ryaw = self.ryaw[glob_index]
-        idx_start = max(0, glob_index - lookbehind_s)
-        idx_end = min(glob_index + lookahead_s, len(self.rx))  
-
-        gx = np.array(self.rx[idx_start:idx_end])
-        gy = np.array(self.ry[idx_start:idx_end])
-
-        dx, dy = gx - x, gy - y
-        c, s  = np.cos(ryaw), np.sin(ryaw)
-        lx =  c*dx + s*dy
-        ly = -s*dx + c*dy
-
-        return lx, ly 
-    
-    # 위에서 구한 local 경로 점 보간, 밑에 두개의 값 사용하고 싶으면 사전에 한번 호출해야됨
-    def local_path(self, x, y):
-        lx, ly = self.get_local_path(x, y)
-        if len(lx) < 2:
-            self.local_x, self.local_y, self.local_yaw = [],[],[]
-            return 
-        else:
-            self.local_x, self.local_y, self.local_yaw,_ ,_ ,self.local_s = cubic_spline_planner.calc_spline_course(lx, ly, ds=0.1)  
-        
-    # 실시간으로 변하는 local 경로에서, GPS음영에서는 비전에서 받는 경로 그대로 사용해서 local_x,y에 저장하기(mission 값으로 판단->추후 수정)
-    def getClosestSIndexCurXY_local(self, mode, mission=None): 
-        ref_index = 0
-        iteration = len(self.local_x)
-        
-        ref_index = cartesian_frenet_conversion.getClosestSPoint(self.local_x, self.local_y, 0, 0, self.last_local_index, iteration, mode=mode, mission=mission)
-        self.last_local_index = ref_index
-        return ref_index
-
-    # local좌표에서 얻는 q값 (x,y값은 차의 위치(0,0)이나 장애물의 위치임)
-    def xy2sl_local(self, x, y, mode=1, mission=None):
-        ref_index = self.getClosestSIndexCurXY_local(mode=mode, mission=mission)
-        return self.local_s[ref_index], cartesian_frenet_conversion.calcOffsetPoint(x, y, self.local_x[ref_index], self.local_y[ref_index], self.local_yaw[ref_index]) 
-    ################################################################
+        self.s_arr = np.array(self.s)
    
     def getClosestSIndexCurXY(self, x, y, mode=0, base_iter=30, mission=None): 
         ref_index = 0
@@ -110,23 +68,22 @@ class GlobalPath:
         else:
             pass
 
-        return ref_index                                                                         
+        return ref_index                             
 
     def getClosestSIndexCurS(self, s):
-        s_arr = np.asarray(self.s)
-        index = np.searchsorted(s_arr, s, side='right') - 1
-        index = np.clip(index, 0 ,len(s_arr)-1) 
+        index = np.searchsorted(self.s_arr, s, side='right') - 1
+        index = np.clip(index, 0 ,len(self.s_arr)-1) 
         return index    
-
-    # mode 0 -> 찾던 위치 근처에서 찾기, mode 1 처음부터 찾기
+    
     def xy2sl(self, x, y, mode=0, base_iter=30, mission=None):
         ref_index = self.getClosestSIndexCurXY(x, y, mode=mode, base_iter=base_iter, mission=mission)
         self.cur_ref_index = ref_index
         return self.s[ref_index], cartesian_frenet_conversion.calcOffsetPoint(x, y, self.rx[ref_index],
                                                                               self.ry[ref_index], self.ryaw[ref_index]) #l값
-
+    
     def get_current_reference_yaw(self):
-        return self.ryaw[self.cur_s_ref_index]
+        yaw = self.ryaw_arr[self.cur_s_ref_index]
+        return np.array(np.where(yaw<=0, yaw+2*np.pi, yaw))
     
     def get_current_reference_yaw_no_s(self):
         return self.ryaw_arr[self.cur_ref_index]
@@ -160,20 +117,6 @@ class GlobalPath:
            max_max = 2 * np.pi - max_max
        
        return max_max
-   
-    #############################곡선 판단용 새로만듬 ################################
-    def det_sharp_curve(self, threshold_avg_kappa = 0.15, threshold_delta_yaw = np.deg2rad(20), offset = 0): ##threshold, offset 다 parameter
-        cur_index = self.cur_ref_index
-        target_index = min(cur_index + offset, len(self.ryaw) - 1)
-        
-        avg_kappa = np.mean(self.rk[cur_index:target_index])
-        delta_yaw = self.max_curvature(self.ryaw[target_index], self.ryaw[cur_index])
-        
-        sharp = True if abs(avg_kappa) > threshold_avg_kappa and delta_yaw > threshold_delta_yaw else False
-        
-        goal_angle = self.ryaw[target_index] if sharp else 0.0
-        return sharp, goal_angle
-    #############################################################################
     
     def det_target_speed(self):
         # 곡선도로 타겟 속도 계산

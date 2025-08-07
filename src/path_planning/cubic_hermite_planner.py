@@ -29,6 +29,8 @@ def hermite_with_constraints(start, end, yaw_start, yaw_end):
     # 시작과 끝점의 좌표, yaw값의 tangent값
     x = [start[0], end[0]]
     y = [start[1], end[1]]
+    print(x)
+    print(y)
     inc = [np.tan(yaw_start), np.tan(yaw_end)]  
     
     # scipy에 내장된 cubic_hermit_spline 사용

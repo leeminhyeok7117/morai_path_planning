@@ -114,6 +114,7 @@ class cubic_polynomial:
         a2 = (3*(qf - qi) - (2*qi' + qf')*(sf - si)) / (sf - si)**2
         a3 = (2*(qi - qf) + (qi' + qf')*(sf - si)) / (sf - si)**3
         """
+        
         self.si, self.ds, self.qf = si, ds, qf
         
         # 경로의 시작을 헤딩과 같은 방향으로 생성하기 위해서

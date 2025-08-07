@@ -14,14 +14,14 @@ from sensor_msgs import point_cloud2
 from global_path import GlobalPath
 from cubic_hermite_planner import hermite_with_constraints
 
-TABLE_PATH = os.path.dirname(os.path.abspath(__file__)) + "/lookup_table.csv"
+TABLE_PATH = "src/molt/lookup_table.csv"
 Param = namedtuple('Param',['nxy','nh','d','a_min','a_max','p_min','p_max','ns'])
 
 class StateLatticePlanner:
     def __init__(self, gp_name):
-        self.candidate_pub = rospy.Publisher('/CDpath_st', PointCloud2, queue_size=10)
-        self.selected_pub = rospy.Publisher('/SLpath_st', PointCloud2, queue_size=10)
-        self.current_speed_sub = rospy.Subscriber('/current_speed', Float64, self.current_speed_callback, queue_size=1)
+        self.candidate_pub = rospy.Publisher('/CDpath_sl', PointCloud2, queue_size=10)
+        self.selected_pub = rospy.Publisher('/SLpath_sl', PointCloud2, queue_size=10)
+        self.current_speed_sub = rospy.Subscriber('/speed', Float64, self.current_speed_callback, queue_size=1)
         
         self.glob_path = GlobalPath(gp_name)
         self.lookup_table = self.get_lookup_table(TABLE_PATH)
@@ -74,7 +74,7 @@ class StateLatticePlanner:
         pc2_msg.is_dense = True 
 
         self.candidate_pub.publish(pc2_msg)
-        
+
     #classification using speed
     def current_speed_callback(self, data):
         v_max = 30.0 #나중에 환산 
@@ -229,8 +229,8 @@ class StateLatticePlanner:
         return states[idx]
     
     # Select when OBS is displayed, curves are displayed, or straight
-    def generate_candidate_points(self, obs_xy, x, y, yaw, path_num = 9):
-        self.glob_path.local_path(x, y, yaw)
+    def generate_candidate_points(self, obs_xy, x, y, path_num = 9):
+        self.glob_path.local_path(x, y)
         
         curve_flag, goal_angle_curve = self.glob_path.det_sharp_curve()
         obs_flag = True if obs_xy is not None else False
@@ -243,18 +243,18 @@ class StateLatticePlanner:
             
         states = self.calc_biased_coordinate(goal_angle) if curve_flag or obs_flag else self.calc_normal_coordinate()
         candidate_points_sampling = self.candidate_point_at_sampling(states, goal_angle, path_num)
-        
         candidate_points = []
         _, idxs = self.kdtree.query(candidate_points_sampling, k=1) 
         candidate_points = self.lookup_table[idxs]
-            
+        
         return candidate_points
     
     # Spline candidate_paths
-    def generate_hermite_spline(self, candidate_points, point_num=5):
+    def generate_hermite_spline(self, candidate_points, heading, point_num=5):
         candidate_paths = []                
         for state in candidate_points:
-            x_vals, y_vals, yaw_vals, _ = hermite_with_constraints([0,0], [state[0], state[1]], 0, state[2]) #현재 yaw값 적용해야되는지 잘 몰겟(아닐듯?)
+            print(f"Generating spline with: x = {state[0]:.4f}, y = {state[1]:.4f}, start_yaw = {heading:.4f}, goal_yaw = {state[2]:.4f}")
+            x_vals, y_vals, yaw_vals, _ = hermite_with_constraints([0,0], [state[0], state[1]], heading, state[2]) #현재 yaw값 적용해야되는지 잘 몰겟(아닐듯?)
             
             idxs = np.round(np.linspace(0, len(x_vals)-1, point_num)).astype(int)
             candidate_path = np.stack([x_vals[idxs],y_vals[idxs],yaw_vals[idxs]], axis=1) 
@@ -289,12 +289,12 @@ class StateLatticePlanner:
         return cost1*self.weight_1 + cost2*self.weight_2
         
     def state_lattice_planner(self, x, y, heading, obs_xy=None):
-        candidate_points = self.generate_candidate_points(obs_xy, x, y, heading)
-        candidate_paths = np.array(self.generate_hermite_spline(candidate_points))
+        candidate_points = self.generate_candidate_points(obs_xy, x, y)
+        candidate_paths = np.array(self.generate_hermite_spline(candidate_points, heading))
         self.visual_candidate_paths(candidate_paths)
         selected_path = min(candidate_paths,key=lambda p: self.cost_function(p, obs_xy))   
         self.visual_selected_path(selected_path)
-        
+
         return selected_path
         
         

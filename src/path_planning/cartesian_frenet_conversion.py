@@ -25,7 +25,7 @@ def get_mission_coord():
     return mission_name
 
 
-def getClosestSPoint(rx, ry, x, y, last_search, iteration, mode, mission):  # 연산 속도 높이기 성공 # 경로 위치(x,y)와 가장 가까운 점(s 인덱스)을 찾는다.
+def getClosestSPoint(rx, ry, x, y, last_search, iteration, mode, mission):
     global initialize_mission_flag
     global mission_name
     global last_closestrefpoint
@@ -33,29 +33,23 @@ def getClosestSPoint(rx, ry, x, y, last_search, iteration, mode, mission):  # �
     if initialize_mission_flag is False:
         get_mission_coord()
         initialize_mission_flag = True
-
+        
     closestrefpoint, low, upper = 0, 0, 0
+    position = np.array([x, y])
 
-    if mode == 0:  # 가장 가까운 s 인덱스를 찾을 때 기존 위치 근처에서부터 탐색
+    if mode == 0:
         searchFlag = (last_search + iteration) < len(rx) and (last_search - iteration) > 0
         low = last_search - iteration if searchFlag else 0
         upper = last_search + iteration if searchFlag else len(rx)
 
-        mindistance = 999
-        position = [x, y]
-        closestrefpoint = 0
+        ref_positions = np.column_stack((rx[low:upper], ry[low:upper]))
+        distances = np.linalg.norm(ref_positions - position, axis=1)
+        try:
+            closestrefpoint = np.argmin(distances) + low
+        except ValueError:
+            closestrefpoint = last_closestrefpoint
 
-        for i in range(low, upper-1):
-            ref_position = [rx[i], ry[i]]
-            t_distance = distance.euclidean(position, ref_position)
-            if t_distance < mindistance:
-                mindistance = t_distance
-                closestrefpoint = i
-            else:
-                continue
-
-    elif mode == 1:  # 가장 가까운 s 인덱스를 찾을 때 전체 경로에서 탐색
-        position = np.array([x, y])
+    elif mode == 1:
         searchFlag = (last_search + iteration) < len(rx) and (last_search - iteration) > 0
 
         if mission is None:
@@ -78,7 +72,6 @@ def getClosestSPoint(rx, ry, x, y, last_search, iteration, mode, mission):  # �
 
     return closestrefpoint
 
-
 def calcOffsetPoint(x, y, cur_rx, cur_ry, cur_ryaw):
     position = np.array([x, y])
     ref_point = np.array([cur_rx, cur_ry])
@@ -86,7 +79,6 @@ def calcOffsetPoint(x, y, cur_rx, cur_ry, cur_ryaw):
     pose_vec = np.array(position - ref_point)
 
     return copysign(distance.euclidean(position, ref_point), np.cross(base_vec, pose_vec))
-
 
 def sl2xy(s, l, cur_rx, cur_ry, cur_ryaw):
     x = cur_rx + l*cos(cur_ryaw + pi/2)
